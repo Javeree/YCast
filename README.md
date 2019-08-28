@@ -4,13 +4,13 @@
 
 YCast is a self hosted replacement for the vTuner internet radio service which some Yamaha AVRs use.
 
-It was developed for and tested with the __RX-Vx73__ series.
-
+It was initially developed for and tested with the __RX-Vx73__ series.
 It _should_ also work for the following Yamaha AVR models:
  * RX-Vx75
  * RX-Vx77
  * RX-Vx79
  * RX-Vx81
+This version has been adapted and tested with the __RX-V577__ series, but not retested for the above models
 
 YCast is for you if:
  * You do not want to use a proprietary streaming service
@@ -18,7 +18,7 @@ YCast is for you if:
  * You are unsure about the continuation of the service from Yamaha/vTuner
 
 ## Dependencies:
-Python version: `3`
+Python version: `3.6`
 
 Python packages:
  * `PyYAML`
@@ -31,7 +31,7 @@ itself gets handled by the AVR directly, i.e. you can run it on a low-spec RISC 
 * Create your initial `stations.yml`. The config follows a basic YAML structure (see below)
 * Create a manual entry in your DNS server (read 'Router' for most home users) for:
 
-  `radioyamaha.vtuner.com`
+  `radioyamaha.vtuner.com` and/or `radioyamaha2.vtuner.com` 
 
   to point to the local machine running YCast.
 
@@ -42,7 +42,13 @@ itself gets handled by the AVR directly, i.e. you can run it on a low-spec RISC 
 Category one name:
   First awesome station name: first.awesome/station/URL
   Second awesome station name: second.awesome/station/URL
-
+  Subcategory one name:
+    First station in subcategory one: first.sub/station/URL
+    Second station in subcategory one: second.sub/station/URL
+  Subcategory two name:
+    First station in subcategory two: first.sub2/station/URL
+    Second station in subcategory two: second.sub2/station/URL
+  ...
 Category two name:
   Third awesome station name: third.awesome/station/URL
   Fourth awesome station name: fourth.awesome/station/URL
@@ -50,6 +56,7 @@ Category two name:
 
 You can also have a look at the provided [example](examples/stations.yml.example) to better understand the configuration.
 
+The location of the stations.yml file can be specified on the command line using `-s filepath`
 
 ## Web server configuration
 
@@ -83,3 +90,7 @@ YCast was a quick and dirty project to lay the foundation for having a self host
 It is a barebone service at the moment. It provides your AVR with the basic info it needs to play internet radio stations. 
 Maybe this will change in the future, maybe not.
 For now just station names and URLs; no web-based management interface, no coverart, no cute kittens, no fancy stuff.
+
+The RX-577 shows only the first 8 entries of the top categories from stations.yml (no such limit for the subcategories)
+The initial response should probably contain a tag with the amount of entries.
+To know what tag,someone should tcpdump the full http conversation with the real server.
