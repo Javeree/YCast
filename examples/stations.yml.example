@@ -1,8 +1,11 @@
 AAA_Bookmarks:
   Radio Paradise: http://stream.radioparadise.com/mp3-192
-
+  RP Mellow: http://icy-7.radioparadise.com/mellow-192
+  Willy: https://20723.live.streamtheworld.com/WILLY.mp3
+  Zenith Rock: http://148.163.81.10:8006/stream
 By Location:
     Belgie:
+        Willy: https://20723.live.streamtheworld.com/WILLY.mp3
         VRT Radio 1: http://icecast.vrtcdn.be/radio1-high.mp3
         VRT Radio 2:
             VRT Radio 2 Antwerpen: http://icecast.vrtcdn.be/ra2ant-high.mp3
@@ -30,12 +33,15 @@ News + Talk:
 
 By Genre:
     Rock:
+        Willy: https://20723.live.streamtheworld.com/WILLY.mp3
         Nostalgie.be Rock Classics: http://streamingp.shoutcast.com/NostalgieRockClassics
         Rock FM: http://streams.movemedia.eu:8440/;stream
+        Zenith Rock: http://148.163.81.10:8006/stream
 
     Easy Listening:
         Positivity Radio: http://ample-07.radiojar.com/d90sb07byuquv
         Nostalgie Pop: http://streamingp.shoutcast.com/NostalgieLove
+        RP Mellow: http://icy-7.radioparadise.com/mellow-192
 
     Classical:
         Klara: http://icecast.vrtcdn.be/klara-high.mp3

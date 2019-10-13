@@ -1,0 +1,14 @@
+# /etc/conf.d/ycast
+
+supervisor="supervise-daemon"
+#rc_need="nginx"	# when running on a port different than 80, I use nginx on this PC as a reverse proxy
+
+# ycast should listen on an IP address that is provided by dnsmasq (from name ycast).
+#	It should be different from the addresses where e.g. nginx listens for port 80 (so no 'listen 80' in nginx.conf, but 192.168.4.1:80)
+#	no other server should be listening on this IP address & port 80
+#	I do this because simply using proxy_pass in nginx doesn't work. It looks like Yamaha doesn't like the proxied reply
+#	check /etc/dnsmasq.d for the matching configuration
+
+YCAST_ARGS="-l ycast -p 80"
+YCAST_ARGS="$YCAST_ARGS -s /vetc/resources/net-radio/stations.yml"
+
