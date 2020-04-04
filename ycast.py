@@ -24,6 +24,16 @@ logger.addHandler(logging.handlers.SysLogHandler('/dev/log', facility))
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+def filter_url(url):
+    ''' Check the url and translate it if needed into a direct url '''
+    if 'streamtheworld.com/' in url:
+        http = urllib3.PoolManager()
+        resp = http.urlopen('GET', url, redirect=False)
+        newurl = resp.get_redirect_location()
+        return newurl
+    return url
+
+
 class StationSource():
     def __init__(self, source):
         self.stations = {}
@@ -203,7 +213,7 @@ class YCastHandler(BaseHTTPRequestHandler):
         etree.SubElement(item, 'ItemType').text = 'Station'
         etree.SubElement(item, 'StationName').text = name
         etree.SubElement(item, 'StationId').text = str(station_id)
-        etree.SubElement(item, 'StationUrl').text = url
+        etree.SubElement(item, 'StationUrl').text = filter_url(url)
         return item
 
 
@@ -212,7 +222,20 @@ class YCastServer(HTTPServer):
     '''
     def __init__(self, source, *args, **kwargs):
         self.source = StationSource(source)
+        address,port = args[0]
+        logger.info(f'YCast server listening on {address}:{port}')
         super().__init__(*args, **kwargs)
+
+
+    def __enter__(self):
+        print('entering')
+        return self
+
+
+    def __exit__(self, *args):
+        print('exiting')
+        logger.info('YCast server shutting down')
+        self.server_close()
 
 
 parser = argparse.ArgumentParser(description='vTuner API emulation')
@@ -221,18 +244,14 @@ parser.add_argument('-p', action='store', dest='port', type=int, help='Listen po
 parser.add_argument('-s', action='store', dest='station_list', type=str, help='station list file', default='stations.yml')
 arguments = parser.parse_args()
 try:
-    server = YCastServer(arguments.station_list, (arguments.address, arguments.port), YCastHandler)
+    with YCastServer(arguments.station_list, (arguments.address, arguments.port), YCastHandler) as server:
+        print('listening', server)
+        server.serve_forever()
 except OSError as err:
     logger.error(f'OS reports: \"{err.strerror}\"')
     sys.exit(2)
 except PermissionError:
     logger.error("No permission to create socket. Are you trying to use ports below 1024 without elevated rights?")
     sys.exit(1)
-logger.info('YCast server listening on {arguments.address}:{arguments.port}')
-try:
-    server.serve_forever()
 except KeyboardInterrupt:
     pass
-finally:
-    logger.info('YCast server shutting down')
-    server.server_close()
