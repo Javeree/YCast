@@ -9,6 +9,7 @@ import xml.etree.cElementTree as etree
 import logging
 import logging.handlers
 import yaml
+import urllib3
 
 VTUNER_DNS = 'http://radioyamaha.vtuner.com'
 VTUNER_INITURL = '/setupapp/Yamaha/asp/BrowseXML/loginXML.asp'
@@ -23,6 +24,16 @@ facility = logging.handlers.SysLogHandler.LOG_LOCAL0
 logger.addHandler(logging.handlers.SysLogHandler('/dev/log', facility))
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+def filter_url(url):
+    ''' Check the url and translate it if needed into a direct url '''
+    if 'streamtheworld.com/' in url:
+        http = urllib3.PoolManager()
+        resp = http.urlopen('GET', url, redirect=False)
+        newurl = resp.get_redirect_location()
+        return newurl
+    return url
+
 
 class StationSource():
     def __init__(self, source):
@@ -78,6 +89,7 @@ class YCastHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         ''' Handle the GET request and send reply to the client '''
+        logger.info(f'message received: {self.path}')
         stations = self.server.source.get_stations()
         url_split = parse.urlsplit(self.path)
         url_query_split = parse.parse_qs(url_split.query)
@@ -127,7 +139,11 @@ class YCastHandler(BaseHTTPRequestHandler):
 
 
     def reply_with_dir(self, stations, start=0, max_size=8):
-        ''' Build an xml reply that represents a list of all directories '''
+        ''' Build an xml reply that represents a list of all directories
+            stations: the list of items to display
+            start: the first element of the list to display
+            max_size: the max number of elements to display
+        '''
         xml = self.create_root()
         count = etree.SubElement(xml,'DirCount').text = '9'
         for category in sorted(stations, key=str.lower)[start:start+max_size]:
@@ -138,7 +154,11 @@ class YCastHandler(BaseHTTPRequestHandler):
 
 
     def reply_with_station_list(self, station_list, start=0, max_size=8):
-        ''' Build an xml reply that represents a list of all stations '''
+        ''' Build an xml reply that represents a list of all stations
+            station_list: the list of items to display
+            start: the first element of the list to display
+            max_size: the max number of elements to display
+        '''
         xml = self.create_root()
         for station in sorted(station_list, key=str.lower)[start:start+max_size]:
             station_id, station_url = station_list[station]
@@ -146,7 +166,11 @@ class YCastHandler(BaseHTTPRequestHandler):
         self.write_message(xml)
 
     def reply_with_mixed_list(self, hierarchy, start=0, max_size=8):
-        ''' Build an xml reply that represents a list of mixed stations/directories '''
+        ''' Build an xml reply that represents a list of mixed stations/directories
+            hierarchy: the list of items to display
+            start: the first element of the list to display
+            max_size: the max number of elements to display
+        '''
         station_list = self.server.source.by_hierarchy(hierarchy)
         xml = self.create_root()
         for item in sorted(station_list, key=str.lower)[start:start+max_size]:
@@ -169,7 +193,9 @@ class YCastHandler(BaseHTTPRequestHandler):
         self.end_headers()
         if add_xml_header:
             self.wfile.write(bytes(XMLHEADER, 'utf-8'))
-        self.wfile.write(bytes(etree.tostring(xml).decode('utf-8'), 'utf-8'))
+        reply=etree.tostring(xml).decode('utf-8')
+        logger.info(f'Sending reply: {reply}')
+        self.wfile.write(bytes(reply, 'utf-8'))
 
 
     def create_root(self):
@@ -203,7 +229,7 @@ class YCastHandler(BaseHTTPRequestHandler):
         etree.SubElement(item, 'ItemType').text = 'Station'
         etree.SubElement(item, 'StationName').text = name
         etree.SubElement(item, 'StationId').text = str(station_id)
-        etree.SubElement(item, 'StationUrl').text = url
+        etree.SubElement(item, 'StationUrl').text = filter_url(url)
         return item
 
 
@@ -212,7 +238,18 @@ class YCastServer(HTTPServer):
     '''
     def __init__(self, source, *args, **kwargs):
         self.source = StationSource(source)
+        address,port = args[0]
+        logger.info(f'YCast server listening on {address}:{port}')
         super().__init__(*args, **kwargs)
+
+
+    def __enter__(self):
+        return self
+
+
+    def __exit__(self, *args):
+        logger.info('YCast server shutting down')
+        self.server_close()
 
 
 parser = argparse.ArgumentParser(description='vTuner API emulation')
@@ -221,18 +258,14 @@ parser.add_argument('-p', action='store', dest='port', type=int, help='Listen po
 parser.add_argument('-s', action='store', dest='station_list', type=str, help='station list file', default='stations.yml')
 arguments = parser.parse_args()
 try:
-    server = YCastServer(arguments.station_list, (arguments.address, arguments.port), YCastHandler)
+    with YCastServer(arguments.station_list, (arguments.address, arguments.port), YCastHandler) as server:
+        print('listening', server)
+        server.serve_forever()
 except OSError as err:
     logger.error(f'OS reports: \"{err.strerror}\"')
     sys.exit(2)
 except PermissionError:
     logger.error("No permission to create socket. Are you trying to use ports below 1024 without elevated rights?")
     sys.exit(1)
-logger.info('YCast server listening on {arguments.address}:{arguments.port}')
-try:
-    server.serve_forever()
 except KeyboardInterrupt:
     pass
-finally:
-    logger.info('YCast server shutting down')
-    server.server_close()
