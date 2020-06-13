@@ -9,6 +9,7 @@ import xml.etree.cElementTree as etree
 import logging
 import logging.handlers
 import yaml
+import urllib3
 
 VTUNER_DNS = 'http://radioyamaha.vtuner.com'
 VTUNER_INITURL = '/setupapp/Yamaha/asp/BrowseXML/loginXML.asp'
@@ -88,6 +89,7 @@ class YCastHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         ''' Handle the GET request and send reply to the client '''
+        logger.info(f'message received: {self.path}')
         stations = self.server.source.get_stations()
         url_split = parse.urlsplit(self.path)
         url_query_split = parse.parse_qs(url_split.query)
@@ -137,7 +139,11 @@ class YCastHandler(BaseHTTPRequestHandler):
 
 
     def reply_with_dir(self, stations, start=0, max_size=8):
-        ''' Build an xml reply that represents a list of all directories '''
+        ''' Build an xml reply that represents a list of all directories
+            stations: the list of items to display
+            start: the first element of the list to display
+            max_size: the max number of elements to display
+        '''
         xml = self.create_root()
         count = etree.SubElement(xml,'DirCount').text = '9'
         for category in sorted(stations, key=str.lower)[start:start+max_size]:
@@ -148,7 +154,11 @@ class YCastHandler(BaseHTTPRequestHandler):
 
 
     def reply_with_station_list(self, station_list, start=0, max_size=8):
-        ''' Build an xml reply that represents a list of all stations '''
+        ''' Build an xml reply that represents a list of all stations
+            station_list: the list of items to display
+            start: the first element of the list to display
+            max_size: the max number of elements to display
+        '''
         xml = self.create_root()
         for station in sorted(station_list, key=str.lower)[start:start+max_size]:
             station_id, station_url = station_list[station]
@@ -156,7 +166,11 @@ class YCastHandler(BaseHTTPRequestHandler):
         self.write_message(xml)
 
     def reply_with_mixed_list(self, hierarchy, start=0, max_size=8):
-        ''' Build an xml reply that represents a list of mixed stations/directories '''
+        ''' Build an xml reply that represents a list of mixed stations/directories
+            hierarchy: the list of items to display
+            start: the first element of the list to display
+            max_size: the max number of elements to display
+        '''
         station_list = self.server.source.by_hierarchy(hierarchy)
         xml = self.create_root()
         for item in sorted(station_list, key=str.lower)[start:start+max_size]:
@@ -179,7 +193,9 @@ class YCastHandler(BaseHTTPRequestHandler):
         self.end_headers()
         if add_xml_header:
             self.wfile.write(bytes(XMLHEADER, 'utf-8'))
-        self.wfile.write(bytes(etree.tostring(xml).decode('utf-8'), 'utf-8'))
+        reply=etree.tostring(xml).decode('utf-8')
+        logger.info(f'Sending reply: {reply}')
+        self.wfile.write(bytes(reply, 'utf-8'))
 
 
     def create_root(self):
@@ -228,12 +244,10 @@ class YCastServer(HTTPServer):
 
 
     def __enter__(self):
-        print('entering')
         return self
 
 
     def __exit__(self, *args):
-        print('exiting')
         logger.info('YCast server shutting down')
         self.server_close()
 
