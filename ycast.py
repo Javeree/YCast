@@ -27,10 +27,18 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 
 def filter_url(url):
     ''' Check the url and translate it if needed into a direct url '''
-    if 'streamtheworld.com/' in url:
+    # TODO: an incorrect url can keep this urlopen hanging: if the url is a valid stream, get may be getting the stream data
+    # find out how to detect this (only retrieve first n bytes ?)
+    # specifically, using https://20043.live.streamtheworld.com/WILLY.mp3?pname=rp_external gave an error
+    # whereas https://playerservices.streamtheworld.com/api/livestream-redirect/WILLY.mp3 is OK
+    if 'playerservices.streamtheworld.com/' in url:
         http = urllib3.PoolManager()
-        resp = http.urlopen('GET', url, redirect=False)
-        newurl = resp.get_redirect_location()
+        try:
+            resp = http.urlopen('GET', url, redirect=False, retries=False, timeout=2.0)
+            newurl = resp.get_redirect_location()
+        except Exception as e:
+            logger(f'Exception {e} while filtering url {url}')
+            newurl = url
         return newurl
     return url
 
@@ -145,7 +153,7 @@ class YCastHandler(BaseHTTPRequestHandler):
             max_size: the max number of elements to display
         '''
         xml = self.create_root()
-        count = etree.SubElement(xml,'DirCount').text = '9'
+        count = etree.SubElement(xml,'DirCount').text = str(len(stations))
         for category in sorted(stations, key=str.lower)[start:start+max_size]:
             self.add_dir(xml, category,
                          VTUNER_DNS + '/' + YCAST_LOCATION + '?category=' + parse.quote(category),
@@ -259,7 +267,6 @@ parser.add_argument('-s', action='store', dest='station_list', type=str, help='s
 arguments = parser.parse_args()
 try:
     with YCastServer(arguments.station_list, (arguments.address, arguments.port), YCastHandler) as server:
-        print('listening', server)
         server.serve_forever()
 except OSError as err:
     logger.error(f'OS reports: \"{err.strerror}\"')
